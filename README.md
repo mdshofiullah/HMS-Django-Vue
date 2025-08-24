@@ -1,172 +1,45 @@
-# HMS-Django-Vue
-Features
-User Management: Role-based access (Doctors, Patients, Lab Staff, Admins)
+# Hospital Management System (HMS)
 
-Department Management: Organize hospital departments
+A modern, responsive Hospital Management System built with Django REST Framework backend and Vue.js frontend with Tailwind CSS.
 
-Appointment Scheduling: Book and manage appointments
+## Features
 
-Prescription Management: Create and track prescriptions
+- **Role-Based Authentication**: Different access levels for Admin, Doctor, Lab Staff, and Patients
+- **Patient Registration**: Admin/Doctors can register patients with auto-generated IDs
+- **Patient Login**: Patients can login with their ID and phone number
+- **Appointment Management**: Doctors can create and manage appointments
+- **Prescription Management**: Doctors can create and manage prescriptions
+- **Responsive Design**: Works on desktop, tablet, and mobile
+- **Modern UI**: Clean, professional interface with custom icons
+- **JWT Authentication**: Secure token-based authentication
 
-Responsive Design: Works on desktop, tablet, and mobile
+## Roles and Permissions
 
-Modern UI: Clean, professional interface with custom icons
+- **Admin**: Full system access, can create all types of users
+- **Doctor**: Can manage appointments, prescriptions, and view patient data
+- **Lab Staff**: Can view lab-related data and update test results
+- **Patient**: Can view their medical history, appointments, and download reports
 
-JWT Authentication: Secure token-based authentication
+## Technology Stack
 
-Prerequisites
-Python 3.8+
+### Backend
+- Django 4.2
+- Django REST Framework
+- Simple JWT for authentication
+- SQLite (can be configured for PostgreSQL)
 
-Node.js 16+
+### Frontend
+- Vue.js 3
+- TypeScript
+- Vite
+- Tailwind CSS
+- Font Awesome icons
+- Axios for API calls
 
-npm or yarn
+## Installation & Setup
 
-SQLite (default) or PostgreSQL
+### Backend Setup
 
-Installation & Setup
-Backend (Django)
-Navigate to the backend directory:
-
-bash
-cd backend
-Create a virtual environment:
-
-bash
-python -m venv venv
-Activate the virtual environment:
-
-Windows:
-
-bash
-venv\Scripts\activate
-macOS/Linux:
-
-bash
-source venv/bin/activate
-Install Python dependencies:
-
-bash
-pip install -r requirements.txt
-Apply database migrations:
-
-bash
-python manage.py makemigrations
-python manage.py migrate
-Create a superuser:
-
-bash
-python manage.py createsuperuser
-Run the development server:
-
-bash
-python manage.py runserver
-The backend API will be available at http://localhost:8000
-
-Frontend (Vue.js)
-Navigate to the frontend directory:
-
-bash
-cd frontend/hms-frontend
-Install Node.js dependencies:
-
-bash
-npm install
-Start the development server:
-
-bash
-npm run dev
-The frontend will be available at http://localhost:3000
-
-Usage
-Open your browser and navigate to http://localhost:3000
-
-Register a new account or use the admin account created earlier
-
-Explore the different features based on your role:
-
-Admin: Full access to all features
-
-Doctor: Manage appointments and prescriptions
-
-Patient: Book appointments and view prescriptions
-
-Lab Staff: Access lab-related features
-
-API Endpoints
-GET /api/departments/ - List all departments
-
-GET /api/doctors/ - List all doctors
-
-GET /api/patients/ - List all patients
-
-GET /api/appointments/ - List all appointments
-
-GET /api/prescriptions/ - List all prescriptions
-
-POST /api/register/ - Register a new user
-
-POST /api/login/ - Login and get JWT tokens
-
-Building for Production
-Backend
-Set DEBUG = False in backend/hms/settings.py
-
-Configure your production database
-
-Collect static files:
-
-bash
-python manage.py collectstatic
-Frontend
-Build the production bundle:
-
-bash
-npm run build
-The built files will be in the dist directory
-
-Technologies Used
-Backend
-Django 4.2
-
-Django REST Framework
-
-Simple JWT for authentication
-
-SQLite (can be configured for PostgreSQL)
-
-Frontend
-Vue.js 3
-
-TypeScript
-
-Vite
-
-Tailwind CSS
-
-Font Awesome icons
-
-Axios for API calls
-
-Contributing
-Fork the repository
-
-Create a feature branch
-
-Make your changes
-
-Add tests if applicable
-
-Submit a pull request
-
-License
-This project is licensed under the MIT License.
-
-Support
-For support, please open an issue in the GitHub repository or contact the development team.
-
-Acknowledgments
-Icons by Font Awesome
-
-UI components inspired by Tailwind UI
-
-Django REST Framework for the robust API structure
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
