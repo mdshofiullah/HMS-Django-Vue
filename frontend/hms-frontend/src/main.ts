@@ -18,9 +18,14 @@ import {
   faMapMarkerAlt,
   faPhone,
   faEnvelope,
-  faUser as faUserSolid
+  faUser as faUserSolid,
+  faHome,
+  faCog,
+  faBell,
+  faSearch
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { useAuth } from './composables/useAuth'
 
 // Import your CSS file
 import './assets/dashboard.css'
@@ -43,8 +48,16 @@ library.add(
   faMapMarkerAlt,
   faPhone,
   faEnvelope,
-  faUserSolid
+  faUserSolid,
+  faHome,
+  faCog,
+  faBell,
+  faSearch
 )
+
+// Initialize auth
+const { init } = useAuth()
+init()
 
 // Create the app and register the FontAwesomeIcon component globally
 const app = createApp(App)

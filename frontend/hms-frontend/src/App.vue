@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import Sidebar from './components/Sidebar.vue'
 import NavBar from './components/NavBar.vue'
 import FooterBar from './components/FooterBar.vue'
-import DashboardSection from './components/DashboardSection.vue'
+import AdminDashboard from './components/AdminDashboard.vue'
+import DashboardView from './components/DashboardView.vue'
+import PatientDashboard from './components/PatientDashboard.vue'
 import LoginForm from './components/LoginForm.vue'
 import RegisterForm from './components/RegisterForm.vue'
+import PatientRegisterForm from './components/PatientRegisterForm.vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
   faUserDoctor,
@@ -16,7 +20,30 @@ import {
   faSignOutAlt,
   faBars,
   faTimes,
+  faUser,
+  faLock,
+  faExclamationCircle,
+  faCheckCircle,
+  faMapMarkerAlt,
+  faPhone,
+  faEnvelope,
+  faPlus,
+  faEdit,
+  faTrash,
+  faDownload,
+  faUsers,
+  faBuilding,
+  faFlask,
+  faCreditCard,
+  faChartBar,
+  faCalendar,
+  faFileMedical,
+  faCog,
+  faUserCog,
+  faNotesMedical,
+  faFileInvoiceDollar,
 } from '@fortawesome/free-solid-svg-icons'
+import api from './services/api'
 import './assets/dashboard.css'
 
 library.add(
@@ -29,18 +56,51 @@ library.add(
   faSignOutAlt,
   faBars,
   faTimes,
+  faUser,
+  faLock,
+  faExclamationCircle,
+  faCheckCircle,
+  faMapMarkerAlt,
+  faPhone,
+  faEnvelope,
+  faPlus,
+  faEdit,
+  faTrash,
+  faDownload,
+  faUsers,
+  faBuilding,
+  faFlask,
+  faCreditCard,
+  faChartBar,
+  faCalendar,
+  faFileMedical,
+  faCog,
+  faUserCog,
+  faNotesMedical,
+  faFileInvoiceDollar,
 )
 
+// Reactive variables
 const doctors = ref([])
 const patients = ref([])
 const departments = ref([])
 const appointments = ref([])
 const prescriptions = ref([])
+const labTests = ref([])
+const bills = ref([])
+const users = ref([])
 const isAuthenticated = ref(false)
 const currentUser = ref(null)
 const isLoading = ref(true)
 const activeSection = ref('dashboard')
 const mobileMenuOpen = ref(false)
+const dashboardStats = ref({})
+const showPatientRegistration = ref(false)
+const showAppointmentForm = ref(false)
+const showPrescriptionForm = ref(false)
+const showUserForm = ref(false)
+const editingItem = ref(null)
+const editingItemType = ref('')
 
 // Check if user is logged in on app load
 onMounted(() => {
@@ -66,29 +126,55 @@ const fetchData = async () => {
   }
 
   try {
-    const headers = {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+    const endpoints = [
+      '/doctors/',
+      '/patients/',
+      '/departments/',
+      '/appointments/',
+      '/prescriptions/',
+      '/lab-tests/',
+      '/bills/',
+    ]
+
+    // Add users endpoint for admin
+    if (currentUser.value?.role === 'admin') {
+      endpoints.push('/users/')
     }
 
-    const [doctorsRes, patientsRes, departmentsRes, appointmentsRes, prescriptionsRes] =
-      await Promise.all([
-        fetch('http://localhost:8000/api/doctors/', { headers }),
-        fetch('http://localhost:8000/api/patients/', { headers }),
-        fetch('http://localhost:8000/api/departments/', { headers }),
-        fetch('http://localhost:8000/api/appointments/', { headers }),
-        fetch('http://localhost:8000/api/prescriptions/', { headers }),
-      ])
+    const responses = await Promise.all(endpoints.map((endpoint) => api.get(endpoint)))
 
-    if (doctorsRes.ok) doctors.value = await doctorsRes.json()
-    if (patientsRes.ok) patients.value = await patientsRes.json()
-    if (departmentsRes.ok) departments.value = await departmentsRes.json()
-    if (appointmentsRes.ok) appointments.value = await appointmentsRes.json()
-    if (prescriptionsRes.ok) prescriptions.value = await prescriptionsRes.json()
+    doctors.value = responses[0].data
+    patients.value = responses[1].data
+    departments.value = responses[2].data
+    appointments.value = responses[3].data
+    prescriptions.value = responses[4].data
+    labTests.value = responses[5].data
+    bills.value = responses[6].data
+
+    // Set users if admin
+    if (currentUser.value?.role === 'admin' && responses.length > 7) {
+      users.value = responses[7].data
+    }
+
+    // Fetch dashboard stats
+    await fetchDashboardStats()
   } catch (error) {
     console.error('Error fetching data:', error)
+    if (error.response?.status === 401) {
+      handleLogout()
+    }
   } finally {
     isLoading.value = false
+  }
+}
+
+// Fetch dashboard stats
+const fetchDashboardStats = async () => {
+  try {
+    const response = await api.get('/dashboard/stats/')
+    dashboardStats.value = response.data
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error)
   }
 }
 
@@ -113,6 +199,9 @@ const handleLogout = () => {
   departments.value = []
   appointments.value = []
   prescriptions.value = []
+  labTests.value = []
+  bills.value = []
+  users.value = []
   mobileMenuOpen.value = false
 }
 
@@ -125,6 +214,99 @@ const setActiveSection = (section: string) => {
 // Toggle mobile menu
 const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+// Handle creating a new patient
+const handleCreatePatient = () => {
+  showPatientRegistration.value = true
+}
+
+// Handle creating a new appointment
+const handleCreateAppointment = () => {
+  showAppointmentForm.value = true
+  editingItem.value = null
+  editingItemType.value = 'appointment'
+}
+
+// Handle creating a new prescription
+const handleCreatePrescription = () => {
+  showPrescriptionForm.value = true
+  editingItem.value = null
+  editingItemType.value = 'prescription'
+}
+
+// Handle creating a new user (admin only)
+const handleCreateUser = () => {
+  showUserForm.value = true
+  editingItem.value = null
+  editingItemType.value = 'user'
+}
+
+// Handle editing an item
+const handleEditItem = (item: any, type: string) => {
+  if (type === 'appointment') {
+    showAppointmentForm.value = true
+    editingItem.value = item
+    editingItemType.value = 'appointment'
+  } else if (type === 'prescription') {
+    showPrescriptionForm.value = true
+    editingItem.value = item
+    editingItemType.value = 'prescription'
+  } else if (type === 'user') {
+    showUserForm.value = true
+    editingItem.value = item
+    editingItemType.value = 'user'
+  }
+}
+
+// Handle deleting an item
+const handleDeleteItem = async (item: any, type: string) => {
+  if (!confirm(`Are you sure you want to delete this ${type}?`)) return
+
+  try {
+    const response = await api.delete(`/${type}s/${item.id}/`)
+
+    if (response.status === 204) {
+      // Refresh data
+      fetchData()
+    } else {
+      console.error('Failed to delete item')
+    }
+  } catch (error) {
+    console.error('Error deleting item:', error)
+  }
+}
+
+// Handle downloading a report
+const handleDownloadReport = (item: any, type: string) => {
+  // Implement download functionality
+  console.log(`Downloading ${type}:`, item)
+  // This would typically generate a PDF or other document
+  alert(`Downloading ${type} report for ${item.patient?.user?.first_name || item.user?.first_name}`)
+}
+
+// Handle patient registration
+const handlePatientRegistered = () => {
+  showPatientRegistration.value = false
+  fetchData() // Refresh data to show the new patient
+}
+
+// Handle user registration/update
+const handleUserUpdated = () => {
+  showUserForm.value = false
+  fetchData() // Refresh data
+}
+
+// Handle appointment creation/update
+const handleAppointmentUpdated = () => {
+  showAppointmentForm.value = false
+  fetchData() // Refresh data
+}
+
+// Handle prescription creation/update
+const handlePrescriptionUpdated = () => {
+  showPrescriptionForm.value = false
+  fetchData() // Refresh data
 }
 
 // Format doctor information
@@ -172,28 +354,193 @@ const prescriptionItem = (pres: any) => {
   return `<strong>${pres.medication}</strong><br>Dosage: ${pres.dosage}<br>Instructions: ${pres.instructions || 'N/A'}<br>For: ${patientName} by ${doctorName}`
 }
 
+// Format user information
+const userItem = (user: any) => {
+  return `<strong>${user.first_name} ${user.last_name}</strong><br>Username: ${user.username}<br>Role: ${user.role}<br>Email: ${user.email}`
+}
+
 // Stats for dashboard
-const stats = computed(() => [
-  { title: 'Doctors', value: doctors.value.length, icon: 'user-doctor', color: 'blue' },
-  { title: 'Patients', value: patients.value.length, icon: 'user-injured', color: 'green' },
-  { title: 'Departments', value: departments.value.length, icon: 'hospital', color: 'purple' },
-  {
-    title: 'Appointments',
-    value: appointments.value.length,
-    icon: 'calendar-check',
-    color: 'orange',
-  },
-  {
-    title: 'Prescriptions',
-    value: prescriptions.value.length,
-    icon: 'prescription-bottle',
-    color: 'red',
-  },
-])
+const stats = computed(() => {
+  if (currentUser.value?.role === 'admin') {
+    return [
+      {
+        title: 'Total Patients',
+        value: dashboardStats.value.total_patients || patients.value.length,
+        icon: 'user-injured',
+        color: 'green',
+      },
+      {
+        title: 'Total Doctors',
+        value: dashboardStats.value.total_doctors || doctors.value.length,
+        icon: 'user-doctor',
+        color: 'blue',
+      },
+      {
+        title: 'Total Appointments',
+        value: dashboardStats.value.total_appointments || appointments.value.length,
+        icon: 'calendar-check',
+        color: 'purple',
+      },
+      {
+        title: 'Departments',
+        value: dashboardStats.value.total_departments || departments.value.length,
+        icon: 'hospital',
+        color: 'red',
+      },
+      {
+        title: 'Recent Appointments',
+        value: dashboardStats.value.recent_appointments || 0,
+        icon: 'calendar',
+        color: 'yellow',
+      },
+      {
+        title: 'Pending Bills',
+        value:
+          dashboardStats.value.pending_bills ||
+          bills.value.filter((b) => b.status === 'pending').length,
+        icon: 'credit-card',
+        color: 'indigo',
+      },
+    ]
+  } else if (currentUser.value?.role === 'doctor') {
+    return [
+      {
+        title: 'Total Patients',
+        value: dashboardStats.value.total_patients || patients.value.length,
+        icon: 'user-injured',
+        color: 'green',
+      },
+      {
+        title: 'My Appointments',
+        value: dashboardStats.value.my_appointments || appointments.value.length,
+        icon: 'calendar-check',
+        color: 'blue',
+      },
+      {
+        title: "Today's Appointments",
+        value: dashboardStats.value.today_appointments || 0,
+        icon: 'calendar',
+        color: 'purple',
+      },
+      {
+        title: 'My Prescriptions',
+        value: dashboardStats.value.my_prescriptions || prescriptions.value.length,
+        icon: 'prescription-bottle',
+        color: 'red',
+      },
+    ]
+  } else if (currentUser.value?.role === 'patient') {
+    return [
+      {
+        title: 'My Appointments',
+        value: dashboardStats.value.my_appointments || appointments.value.length,
+        icon: 'calendar-check',
+        color: 'blue',
+      },
+      {
+        title: 'My Prescriptions',
+        value: dashboardStats.value.my_prescriptions || prescriptions.value.length,
+        icon: 'prescription-bottle',
+        color: 'green',
+      },
+      {
+        title: 'My Lab Tests',
+        value: dashboardStats.value.my_lab_tests || labTests.value.length,
+        icon: 'flask',
+        color: 'purple',
+      },
+      {
+        title: 'Pending Bills',
+        value:
+          dashboardStats.value.pending_bills ||
+          bills.value.filter((b) => b.status === 'pending').length,
+        icon: 'credit-card',
+        color: 'red',
+      },
+    ]
+  } else if (currentUser.value?.role === 'lab') {
+    return [
+      {
+        title: 'Total Tests',
+        value: dashboardStats.value.total_tests || labTests.value.length,
+        icon: 'flask',
+        color: 'blue',
+      },
+      {
+        title: 'My Tests',
+        value: dashboardStats.value.my_tests || labTests.value.length,
+        icon: 'flask',
+        color: 'green',
+      },
+      {
+        title: 'Pending Tests',
+        value:
+          dashboardStats.value.pending_tests ||
+          labTests.value.filter((t) => t.status === 'pending').length,
+        icon: 'hourglass-half',
+        color: 'yellow',
+      },
+      {
+        title: 'Completed Tests',
+        value:
+          dashboardStats.value.completed_tests ||
+          labTests.value.filter((t) => t.status === 'completed').length,
+        icon: 'check-circle',
+        color: 'purple',
+      },
+    ]
+  }
+
+  return []
+})
+
+// Component for rendering different sections based on role
+const renderDashboard = () => {
+  if (!currentUser.value) return DashboardView
+
+  switch (currentUser.value.role) {
+    case 'admin':
+      return AdminDashboard
+    case 'patient':
+      return PatientDashboard
+    default:
+      return DashboardView
+  }
+}
+
+// Component for rendering different sections
+const renderSection = () => {
+  switch (activeSection.value) {
+    case 'dashboard':
+      return renderDashboard()
+    case 'users':
+      return () => import('./components/UserManagement.vue')
+    case 'departments':
+      return () => import('./components/DepartmentManagement.vue')
+    case 'doctors':
+      return () => import('./components/DoctorManagement.vue')
+    case 'patients':
+      return () => import('./components/PatientManagement.vue')
+    case 'appointments':
+      return () => import('./components/AppointmentManagement.vue')
+    case 'prescriptions':
+      return () => import('./components/PrescriptionManagement.vue')
+    case 'lab-tests':
+      return () => import('./components/LabTestManagement.vue')
+    case 'billing':
+      return () => import('./components/BillingManagement.vue')
+    case 'reports':
+      return () => import('./components/ReportManagement.vue')
+    case 'profile':
+      return () => import('./components/ProfileView.vue')
+    default:
+      return renderDashboard()
+  }
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col">
+  <div class="h-screen flex flex-col">
     <NavBar
       :isAuthenticated="isAuthenticated"
       :user="currentUser"
@@ -204,131 +551,70 @@ const stats = computed(() => [
       @toggleMobileMenu="toggleMobileMenu"
     />
 
-    <main class="flex-1 p-4 md:p-6">
-      <div v-if="isLoading" class="flex justify-center items-center h-64">
-        <div
-          class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"
-        ></div>
-      </div>
+    <div class="flex flex-1 overflow-hidden">
+      <Sidebar
+        :isAuthenticated="isAuthenticated"
+        :user="currentUser"
+        :activeSection="activeSection"
+        @setActiveSection="setActiveSection"
+        :mobileMenuOpen="mobileMenuOpen"
+        @toggleMobileMenu="toggleMobileMenu"
+      />
 
-      <div v-else-if="isAuthenticated">
-        <div v-if="activeSection === 'dashboard'">
-          <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6">
-            Hospital Management System Dashboard
-          </h1>
-
-          <!-- Stats Overview -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
-            <div
-              v-for="stat in stats"
-              :key="stat.title"
-              class="bg-white rounded-lg shadow p-4 flex items-center"
-              :class="`border-l-4 border-${stat.color}-500`"
-            >
-              <div class="mr-4 p-3 rounded-full bg-gray-100">
-                <font-awesome-icon
-                  :icon="stat.icon"
-                  class="text-xl"
-                  :class="`text-${stat.color}-500`"
-                />
-              </div>
-              <div>
-                <p class="text-2xl font-bold text-gray-800">{{ stat.value }}</p>
-                <p class="text-gray-600">{{ stat.title }}</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Main Dashboard Grid -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DashboardSection
-              title="Doctors"
-              :items="doctors"
-              :renderItem="doctorItem"
-              icon="user-doctor"
-              color="blue"
-            />
-            <DashboardSection
-              title="Patients"
-              :items="patients"
-              :renderItem="patientItem"
-              icon="user-injured"
-              color="green"
-            />
-            <DashboardSection
-              title="Departments"
-              :items="departments"
-              :renderItem="departmentItem"
-              icon="hospital"
-              color="purple"
-            />
-            <DashboardSection
-              title="Appointments"
-              :items="appointments"
-              :renderItem="appointmentItem"
-              icon="calendar-check"
-              color="orange"
-            />
-            <DashboardSection
-              title="Prescriptions"
-              :items="prescriptions"
-              :renderItem="prescriptionItem"
-              icon="prescription-bottle"
-              color="red"
-              class="lg:col-span-2"
-            />
-          </div>
+      <main class="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-100">
+        <div v-if="isLoading" class="flex justify-center items-center h-64">
+          <div
+            class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"
+          ></div>
         </div>
 
-        <div v-else-if="activeSection === 'profile'" class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-xl font-bold text-gray-800 mb-6">User Profile</h2>
-          <div v-if="currentUser" class="space-y-4">
-            <div class="flex items-center">
-              <div class="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mr-4">
-                <font-awesome-icon icon="user" class="text-3xl text-blue-500" />
-              </div>
-              <div>
-                <h3 class="text-xl font-semibold">
-                  {{ currentUser.first_name }} {{ currentUser.last_name }}
-                </h3>
-                <p class="text-gray-600 capitalize">{{ currentUser.role }}</p>
-              </div>
-            </div>
+        <div v-else-if="isAuthenticated">
+          <!-- Dynamic section rendering based on activeSection -->
+          <component
+            :is="renderSection()"
+            :stats="stats"
+            :user="currentUser"
+            :doctors="doctors"
+            :patients="patients"
+            :departments="departments"
+            :appointments="appointments"
+            :prescriptions="prescriptions"
+            :labTests="labTests"
+            :bills="bills"
+            :users="users"
+            @create-patient="handleCreatePatient"
+            @create-appointment="handleCreateAppointment"
+            @create-prescription="handleCreatePrescription"
+            @create-user="handleCreateUser"
+            @edit-item="handleEditItem"
+            @delete-item="handleDeleteItem"
+            @download-report="handleDownloadReport"
+          />
+        </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Username</label>
-                <p class="mt-1 p-2 bg-gray-50 rounded-md">{{ currentUser.username }}</p>
+        <div v-else>
+          <!-- Login/Register view -->
+          <div
+            class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl mt-10"
+          >
+            <div class="p-8">
+              <div class="flex justify-center mb-6">
+                <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+                  <font-awesome-icon icon="hospital" class="text-3xl text-blue-500" />
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Email</label>
-                <p class="mt-1 p-2 bg-gray-50 rounded-md">{{ currentUser.email }}</p>
-              </div>
+              <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">
+                Hospital Management System
+              </h2>
+              <p class="text-center text-gray-600 mb-8">Please login or register to continue</p>
+
+              <LoginForm @login="handleLogin" />
+              <RegisterForm @registered="handleLogin" />
             </div>
           </div>
         </div>
-      </div>
-
-      <div
-        v-else
-        class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl mt-10"
-      >
-        <div class="p-8">
-          <div class="flex justify-center mb-6">
-            <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-              <font-awesome-icon icon="hospital" class="text-3xl text-blue-500" />
-            </div>
-          </div>
-          <h2 class="text-2xl font-bold text-center text-gray-800 mb-2">
-            Hospital Management System
-          </h2>
-          <p class="text-center text-gray-600 mb-8">Please login or register to continue</p>
-
-          <LoginForm @login="handleLogin" />
-          <RegisterForm @registered="handleLogin" />
-        </div>
-      </div>
-    </main>
+      </main>
+    </div>
 
     <FooterBar />
   </div>
