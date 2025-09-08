@@ -1,128 +1,162 @@
-import { ref } from 'vue'
-import type { Ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import api from '@/services/api'
 
-interface User {
-  id: number
-  username: string
-  email: string
-  first_name: string
-  last_name: string
-  role: string
+export type User = {
+  id?: number
+  username?: string
+  first_name?: string
+  last_name?: string
+  email?: string
+  role?: string
+  [key: string]: unknown
 }
 
-interface AuthState {
-  user: User | null
-  token: string | null
-  isAuthenticated: boolean
+const isAuthenticated = ref<boolean>(false)
+const currentUser = ref<User | null>(null)
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+// safe localStorage get/parse
+function getJSON(key: string) {
+  try {
+    const v = localStorage.getItem(key)
+    if (!v) return null
+    return JSON.parse(v)
+  } catch {
+    return null
+  }
 }
 
-const state: Ref<AuthState> = ref({
-  user: null,
-  token: null,
-  isAuthenticated: false,
-})
+export async function initAuth() {
+  const access = localStorage.getItem('access_token')
+  const user = getJSON('user') as User | null
+
+  if (access) {
+    // set header for api instance
+    ;(api.defaults.headers as unknown as Record<string, string>).Authorization = `Bearer ${access}`
+    // try to fetch profile to confirm token
+    try {
+      const resp = await api.get('/profile/')
+      currentUser.value = resp.data as User
+      localStorage.setItem('user', JSON.stringify(currentUser.value))
+      isAuthenticated.value = true
+      return
+    } catch (err) {
+      // token invalid or expired — clear stored auth
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      currentUser.value = null
+      isAuthenticated.value = false
+    }
+  } else if (user) {
+    // no token but user present (unlikely) — clear to avoid inconsistent state
+    localStorage.removeItem('user')
+    currentUser.value = null
+    isAuthenticated.value = false
+  }
+}
+
+function extractMessage(err: unknown): string {
+  const maybe = err as { response?: { data?: unknown }; message?: string }
+  const data = maybe.response?.data
+  if (data && typeof data === 'object') {
+    try {
+      // prefer detail / message keys
+      const detail =
+        (data as Record<string, unknown>).detail ?? (data as Record<string, unknown>).message
+      if (typeof detail === 'string') return detail
+      // flatten other field messages
+      const values = Object.values(data)
+      const flat = values
+        .map((v) => {
+          if (Array.isArray(v)) return v.join(' ')
+          if (typeof v === 'string') return v
+          return ''
+        })
+        .filter(Boolean)
+      if (flat.length) return flat.join(' — ')
+    } catch {
+      // fallthrough
+    }
+  }
+  return maybe.message ?? 'Request failed'
+}
 
 export function useAuth() {
-  const init = () => {
-    const token = localStorage.getItem('token')
-    const user = localStorage.getItem('user')
-
-    if (token && user) {
-      state.value.token = token
-      state.value.user = JSON.parse(user)
-      state.value.isAuthenticated = true
-    }
-  }
-
-  const login = async (username: string, password: string) => {
+  async function login(username: string, password: string) {
+    loading.value = true
+    error.value = null
     try {
-      const response = await fetch('http://localhost:8000/api/login/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
-      })
+      const tokenResp = await api.post('/token/', { username, password })
+      const access = tokenResp.data?.access ?? tokenResp.data?.token
+      const refresh = tokenResp.data?.refresh
 
-      const data = await response.json()
+      if (!access) throw new Error('No access token returned')
 
-      if (response.ok) {
-        state.value.token = data.access
-        state.value.user = data.user
-        state.value.isAuthenticated = true
+      localStorage.setItem('access_token', access)
+      if (refresh) localStorage.setItem('refresh_token', refresh)
+      ;(api.defaults.headers as unknown as Record<string, string>).Authorization =
+        `Bearer ${access}`
 
-        // Store in localStorage
-        localStorage.setItem('token', data.access)
-        localStorage.setItem('user', JSON.stringify(data.user))
+      const profileResp = await api.get('/profile/')
+      const user = profileResp.data as User
+      localStorage.setItem('user', JSON.stringify(user))
+      currentUser.value = user
+      isAuthenticated.value = true
 
-        return { success: true, data }
-      } else {
-        return { success: false, error: data.error || 'Login failed' }
-      }
-    } catch (error) {
-      return { success: false, error: 'Network error. Please try again.' }
+      return { success: true, user }
+    } catch (err: unknown) {
+      const msg = extractMessage(err)
+      error.value = msg
+      return { success: false, error: msg }
+    } finally {
+      loading.value = false
     }
   }
 
-  const register = async (userData: any) => {
+  async function register(payload: {
+    username: string
+    email?: string
+    password: string
+    role?: string
+  }) {
+    loading.value = true
+    error.value = null
     try {
-      const response = await fetch('http://localhost:8000/api/register/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        // Auto login after registration
-        return await login(userData.username, userData.password)
-      } else {
-        return { success: false, error: data.error || 'Registration failed' }
-      }
-    } catch (error) {
-      return { success: false, error: 'Network error. Please try again.' }
+      // If role === 'admin' set is_staff (backend may expect that)
+      const body: Record<string, unknown> = { ...payload }
+      if (payload.role === 'admin') body.is_staff = true
+      const resp = await api.post('/register/', body)
+      return { success: true, data: resp.data }
+    } catch (err: unknown) {
+      const msg = extractMessage(err)
+      error.value = msg
+      return { success: false, error: msg }
+    } finally {
+      loading.value = false
     }
   }
 
-  const logout = () => {
-    state.value.token = null
-    state.value.user = null
-    state.value.isAuthenticated = false
-
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-  }
-
-  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
-    const token = state.value.token
-
-    if (!token) {
-      throw new Error('No authentication token found')
+  async function logout() {
+    try {
+      await api.post('/logout/').catch(() => {})
+    } finally {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('user')
+      isAuthenticated.value = false
+      currentUser.value = null
     }
-
-    const defaultOptions: RequestInit = {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    }
-
-    return fetch(url, { ...defaultOptions, ...options })
   }
 
   return {
-    state,
-    init,
+    isAuthenticated,
+    currentUser,
+    loading,
+    error,
     login,
     register,
     logout,
-    fetchWithAuth,
   }
 }

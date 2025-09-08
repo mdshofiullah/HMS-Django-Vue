@@ -1,212 +1,138 @@
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useAuth } from '../composables/useAuth'
-
-const { register } = useAuth()
-
-const formData = ref({
-  username: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  firstName: '',
-  lastName: '',
-  role: 'patient',
-})
-const error = ref('')
-const success = ref('')
-const isLoading = ref(false)
-
-const emit = defineEmits(['registered', 'toggleForm'])
-
-const handleRegister = async () => {
-  // Basic validation
-  if (formData.value.password !== formData.value.confirmPassword) {
-    error.value = 'Passwords do not match'
-    return
-  }
-
-  if (formData.value.password.length < 8) {
-    error.value = 'Password must be at least 8 characters long'
-    return
-  }
-
-  isLoading.value = true
-  error.value = ''
-
-  const result = await register(formData.value)
-
-  if (result.success) {
-    success.value = 'Registration successful! You are now logged in.'
-    emit('registered')
-  } else {
-    error.value = result.error || 'Registration failed. Please try again.'
-  }
-
-  isLoading.value = false
-}
-
-const toggleForm = () => {
-  emit('toggle-form')
-}
-</script>
-
 <template>
-  <div>
-    <h3 class="text-lg font-medium text-gray-800 mb-4 text-center">Create a new account</h3>
-    <form @submit.prevent="handleRegister" class="space-y-4">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label for="firstName" class="block text-sm font-medium text-gray-700">First Name</label>
-          <input
-            type="text"
-            id="firstName"
-            v-model="formData.firstName"
-            required
-            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-        </div>
+  <div class="auth-card">
+    <h2>Create account</h2>
+    <form @submit.prevent="onSubmit" class="form">
+      <input v-model="username" placeholder="Username" required class="input" />
+      <input v-model="email" type="email" placeholder="Email" required class="input" />
+      <input
+        v-model="password"
+        type="password"
+        autocomplete="new-password"
+        placeholder="Password"
+        required
+        class="input"
+      />
+      <input
+        v-model="confirmPassword"
+        type="password"
+        autocomplete="new-password"
+        placeholder="Confirm Password"
+        required
+        class="input"
+      />
+      <label class="label">Role</label>
+      <select v-model="role" class="input">
+        <option value="patient">Patient</option>
+        <option value="doctor">Doctor</option>
+        <option value="nurse">Nurse</option>
+        <option value="staff">Staff</option>
+        <option value="admin">Admin</option>
+      </select>
 
-        <div>
-          <label for="lastName" class="block text-sm font-medium text-gray-700">Last Name</label>
-          <input
-            type="text"
-            id="lastName"
-            v-model="formData.lastName"
-            required
-            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-        </div>
-      </div>
+      <div v-if="error" class="alert error">{{ error }}</div>
+      <div v-if="success" class="alert success">{{ success }}</div>
 
-      <div>
-        <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-        <input
-          type="text"
-          id="username"
-          v-model="formData.username"
-          required
-          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        />
-      </div>
-
-      <div>
-        <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-        <input
-          type="email"
-          id="email"
-          v-model="formData.email"
-          required
-          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        />
-      </div>
-
-      <div>
-        <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
-        <select
-          id="role"
-          v-model="formData.role"
-          required
-          class="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-        >
-          <option value="patient">Patient</option>
-          <option value="doctor">Doctor</option>
-          <option value="lab">Lab Staff</option>
-          <option value="admin">Admin</option>
-        </select>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-          <input
-            type="password"
-            id="password"
-            v-model="formData.password"
-            required
-            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-        </div>
-
-        <div>
-          <label for="confirmPassword" class="block text-sm font-medium text-gray-700"
-            >Confirm Password</label
-          >
-          <input
-            type="password"
-            id="confirmPassword"
-            v-model="formData.confirmPassword"
-            required
-            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-        </div>
-      </div>
-
-      <div v-if="error" class="rounded-md bg-red-50 p-4">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <font-awesome-icon icon="exclamation-circle" class="h-5 w-5 text-red-400" />
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium text-red-800">{{ error }}</p>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="success" class="rounded-md bg-green-50 p-4">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <font-awesome-icon icon="check-circle" class="h-5 w-5 text-green-400" />
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium text-green-800">{{ success }}</p>
-          </div>
-        </div>
-      </div>
-
-      <button
-        type="submit"
-        :disabled="isLoading"
-        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-      >
-        <span v-if="isLoading" class="flex items-center">
-          <svg
-            class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              stroke-width="4"
-            ></circle>
-            <path
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          Registering...
-        </span>
-        <span v-else>Register</span>
+      <button :disabled="loading" class="btn primary">
+        {{ loading ? 'Creating…' : 'Create account' }}
       </button>
     </form>
-
-    <div class="mt-4 text-center">
-      <p class="text-sm text-gray-600">
-        Already have an account?
-        <button @click="toggleForm" class="font-medium text-blue-600 hover:text-blue-500">
-          Login here
-        </button>
-      </p>
-    </div>
   </div>
 </template>
 
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useAuth } from '@/composables/useAuth'
+const { register } = useAuth()
+
+const username = ref('')
+const email = ref('')
+const password = ref('')
+const confirmPassword = ref('')
+const role = ref('patient')
+const loading = ref(false)
+const error = ref('')
+const success = ref('')
+
+async function onSubmit() {
+  error.value = ''
+  success.value = ''
+  if (password.value !== confirmPassword.value) {
+    error.value = 'Passwords do not match'
+    return
+  }
+  if (password.value.length < 6) {
+    error.value = 'Password must be at least 6 characters'
+    return
+  }
+  loading.value = true
+  try {
+    const res = await register({
+      username: username.value,
+      email: email.value,
+      password: password.value,
+      role: role.value,
+    })
+    if (res.success) {
+      success.value = 'Registration successful — please sign in'
+    } else {
+      error.value = res.error ?? 'Registration failed'
+    }
+  } catch (err) {
+    console.error('Register error', err)
+    error.value = 'Registration failed. See server logs for details.'
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
 <style scoped>
-/* Custom styles if needed */
+.auth-card {
+  max-width: 780px;
+  margin: 20px auto;
+  padding: 20px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+.form {
+  display: grid;
+  gap: 12px;
+}
+.input {
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+.btn {
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+}
+.primary {
+  background: #1a75bc;
+  color: #fff;
+}
+.alert {
+  padding: 8px;
+  border-radius: 6px;
+}
+.error {
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+.success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #bbf7d0;
+}
+.label {
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .auth-card {
+    margin: 12px;
+  }
+}
 </style>

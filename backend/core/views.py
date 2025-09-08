@@ -24,12 +24,14 @@ class DashboardStatsView(APIView):
         stats = {}
         
         if user.role == 'admin':
+            recent_appointments = Appointment.objects.order_by('-created_at')[:5]
             stats = {
                 'total_patients': Patient.objects.count(),
                 'total_doctors': Doctor.objects.count(),
                 'total_appointments': Appointment.objects.count(),
                 'total_departments': Department.objects.count(),
-                'recent_appointments': Appointment.objects.order_by('-created_at')[:5].count(),
+                # 'recent_appointments': Appointment.objects.order_by('-created_at')[:5],
+                'recent_appointments': len(recent_appointments),
                 'pending_bills': Billing.objects.filter(status='pending').count(),
             }
         elif user.role == 'doctor':
@@ -39,6 +41,7 @@ class DashboardStatsView(APIView):
                 'my_appointments': Appointment.objects.filter(doctor=doctor).count(),
                 'today_appointments': Appointment.objects.filter(doctor=doctor, date=date.today()).count(),
                 'my_prescriptions': Prescription.objects.filter(doctor=doctor).count(),
+                'pending_lab_tests': LabTest.objects.filter(doctor=doctor, status='pending').count()
             }
         elif user.role == 'patient':
             patient = Patient.objects.get(user=user)

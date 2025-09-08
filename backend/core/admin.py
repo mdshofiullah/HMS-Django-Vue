@@ -2,6 +2,11 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import User, Department, Doctor, Patient, Appointment, Prescription, LabTest, Billing, LabStaff
 
+class PrescriptionInline(admin.TabularInline):
+    model = Prescription
+    extra = 0
+
+
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     list_display = ('username', 'email', 'first_name', 'last_name', 'role', 'is_staff')
@@ -27,6 +32,7 @@ class PatientAdmin(admin.ModelAdmin):
 class AppointmentAdmin(admin.ModelAdmin):
     list_display = ('patient', 'doctor', 'date', 'time', 'status')
     list_filter = ('status', 'date')
+    inlines = [PrescriptionInline]
 
 @admin.register(Prescription)
 class PrescriptionAdmin(admin.ModelAdmin):

@@ -40,9 +40,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         if user.role == 'patient':
             Patient.objects.create(user=user)
         elif user.role == 'doctor':
-            Doctor.objects.create(user=user)
+            Doctor.objects.create(user=user, department=None)
         elif user.role == 'lab':
-            LabStaff.objects.create(user=user)
+            LabStaff.objects.create(user=user,  department=None)
             
         return user
 
