@@ -1,160 +1,156 @@
-import { ref, onMounted } from 'vue'
+import { ref, readonly } from 'vue'
 import api from '@/services/api'
+import type { AxiosResponse } from 'axios'
 
-export type User = {
+export interface User {
   id?: number
   username?: string
+  email?: string
   first_name?: string
   last_name?: string
-  email?: string
-  role?: string
-  [key: string]: unknown
+  role?: 'admin' | 'doctor' | 'patient' | 'staff' | string
+  [k: string]: unknown
 }
 
-const isAuthenticated = ref<boolean>(false)
-const currentUser = ref<User | null>(null)
+export interface Patient {
+  id: number
+  full_name?: string
+  age?: number
+  phone?: string
+  [k: string]: unknown
+}
+
+export interface Doctor {
+  id: number
+  name?: string
+  specialty?: string
+  status?: string
+  [k: string]: unknown
+}
+
+export interface Appointment {
+  id: number
+  patient_name?: string
+  doctor_name?: string
+  scheduled_at?: string
+  status?: string
+  [k: string]: unknown
+}
+
+export interface LabTest {
+  id: number
+  patient_name?: string
+  test_name?: string
+  status?: string
+  [k: string]: unknown
+}
+
+export interface Bill {
+  id: number
+  patient_name?: string
+  total?: number
+  status?: string
+  [k: string]: unknown
+}
+
+export interface Stats {
+  [k: string]: number | string
+}
+
+const currentUser = ref<User | null>(
+  localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') as string) : null,
+)
+const isAuthenticated = ref<boolean>(!!localStorage.getItem('access_token'))
 const loading = ref(false)
-const error = ref<string | null>(null)
+const authError = ref<string | null>(null)
 
-// safe localStorage get/parse
-function getJSON(key: string) {
-  try {
-    const v = localStorage.getItem(key)
-    if (!v) return null
-    return JSON.parse(v)
-  } catch {
-    return null
-  }
-}
-
-export async function initAuth() {
+export async function initAuth(): Promise<void> {
   const access = localStorage.getItem('access_token')
-  const user = getJSON('user') as User | null
-
-  if (access) {
-    // set header for api instance
-    ;(api.defaults.headers as unknown as Record<string, string>).Authorization = `Bearer ${access}`
-    // try to fetch profile to confirm token
-    try {
-      const resp = await api.get('/profile/')
-      currentUser.value = resp.data as User
-      localStorage.setItem('user', JSON.stringify(currentUser.value))
-      isAuthenticated.value = true
-      return
-    } catch (err) {
-      // token invalid or expired — clear stored auth
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      localStorage.removeItem('user')
-      currentUser.value = null
-      isAuthenticated.value = false
-    }
-  } else if (user) {
-    // no token but user present (unlikely) — clear to avoid inconsistent state
-    localStorage.removeItem('user')
-    currentUser.value = null
+  if (!access) {
     isAuthenticated.value = false
+    currentUser.value = null
+    return
   }
-}
-
-function extractMessage(err: unknown): string {
-  const maybe = err as { response?: { data?: unknown }; message?: string }
-  const data = maybe.response?.data
-  if (data && typeof data === 'object') {
-    try {
-      // prefer detail / message keys
-      const detail =
-        (data as Record<string, unknown>).detail ?? (data as Record<string, unknown>).message
-      if (typeof detail === 'string') return detail
-      // flatten other field messages
-      const values = Object.values(data)
-      const flat = values
-        .map((v) => {
-          if (Array.isArray(v)) return v.join(' ')
-          if (typeof v === 'string') return v
-          return ''
-        })
-        .filter(Boolean)
-      if (flat.length) return flat.join(' — ')
-    } catch {
-      // fallthrough
-    }
+  ;(api.defaults.headers as Record<string, string | undefined>).Authorization = `Bearer ${access}`
+  try {
+    const resp: AxiosResponse<User> = await api.get('/profile/')
+    currentUser.value = resp.data
+    isAuthenticated.value = true
+    localStorage.setItem('user', JSON.stringify(resp.data))
+  } catch {
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user')
+    isAuthenticated.value = false
+    currentUser.value = null
   }
-  return maybe.message ?? 'Request failed'
 }
 
 export function useAuth() {
   async function login(username: string, password: string) {
     loading.value = true
-    error.value = null
+    authError.value = null
     try {
-      const tokenResp = await api.post('/token/', { username, password })
-      const access = tokenResp.data?.access ?? tokenResp.data?.token
-      const refresh = tokenResp.data?.refresh
-
+      const resp = await api.post('/token/', { username, password })
+      const data = resp.data as Record<string, unknown>
+      const access = (data.access ?? data.token) as string | undefined
+      const refresh = data.refresh as string | undefined
       if (!access) throw new Error('No access token returned')
 
       localStorage.setItem('access_token', access)
       if (refresh) localStorage.setItem('refresh_token', refresh)
-      ;(api.defaults.headers as unknown as Record<string, string>).Authorization =
+      ;(api.defaults.headers as Record<string, string | undefined>).Authorization =
         `Bearer ${access}`
 
-      const profileResp = await api.get('/profile/')
-      const user = profileResp.data as User
-      localStorage.setItem('user', JSON.stringify(user))
-      currentUser.value = user
+      const profileResp = await api.get<User>('/profile/')
+      currentUser.value = profileResp.data
+      localStorage.setItem('user', JSON.stringify(profileResp.data))
       isAuthenticated.value = true
-
-      return { success: true, user }
-    } catch (err: unknown) {
-      const msg = extractMessage(err)
-      error.value = msg
-      return { success: false, error: msg }
+      return { success: true }
+    } catch (err) {
+      const e = err as unknown as { response?: { data?: unknown }; message?: string }
+      authError.value = (e.response?.data as any)?.detail ?? e.message ?? 'Login failed'
+      return { success: false, error: authError.value }
     } finally {
       loading.value = false
     }
   }
 
-  async function register(payload: {
-    username: string
-    email?: string
-    password: string
-    role?: string
-  }) {
+  async function register(payload: Record<string, unknown>) {
     loading.value = true
-    error.value = null
+    authError.value = null
     try {
-      // If role === 'admin' set is_staff (backend may expect that)
-      const body: Record<string, unknown> = { ...payload }
-      if (payload.role === 'admin') body.is_staff = true
-      const resp = await api.post('/register/', body)
-      return { success: true, data: resp.data }
-    } catch (err: unknown) {
-      const msg = extractMessage(err)
-      error.value = msg
-      return { success: false, error: msg }
+      const resp = await api.post('/register/', payload)
+      return { success: true, data: resp.data as unknown }
+    } catch (err) {
+      const e = err as unknown as { response?: { data?: unknown }; message?: string }
+      authError.value = (e.response?.data as any) ?? e.message ?? 'Registration failed'
+      return { success: false, error: authError.value }
     } finally {
       loading.value = false
     }
   }
 
   async function logout() {
+    loading.value = true
     try {
-      await api.post('/logout/').catch(() => {})
+      await api.post('/auth/logout/').catch(() => {})
     } finally {
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('user')
-      isAuthenticated.value = false
       currentUser.value = null
+      isAuthenticated.value = false
+      ;(api.defaults.headers as Record<string, string | undefined>).Authorization = ''
+      loading.value = false
     }
   }
 
   return {
-    isAuthenticated,
-    currentUser,
-    loading,
-    error,
+    currentUser: readonly(currentUser),
+    isAuthenticated: readonly(isAuthenticated),
+    loading: readonly(loading),
+    authError: readonly(authError),
     login,
     register,
     logout,

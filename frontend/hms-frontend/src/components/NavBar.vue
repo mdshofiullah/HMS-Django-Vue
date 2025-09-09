@@ -1,26 +1,60 @@
 <script setup lang="ts">
 import { defineProps, defineEmits } from 'vue'
-const props = defineProps<{ user: any; isAuthenticated: boolean }>()
+const props = defineProps<{ user?: Record<string, unknown> | null }>()
 const emit = defineEmits(['logout'])
+
+function logout() {
+  emit('logout')
+}
 </script>
 
 <template>
-  <header class="bg-white shadow px-4 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <button class="md:hidden p-2"><font-awesome-icon icon="bars" /></button>
-      <div class="flex items-center gap-2">
-        <font-awesome-icon icon="hospital" class="text-blue-600 text-xl" />
-        <span class="font-bold">HMS</span>
-      </div>
-    </div>
+  <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link" data-widget="pushmenu" href="#" role="button"
+          ><i class="fas fa-bars"></i
+        ></a>
+      </li>
+      <li class="nav-item d-none d-sm-inline-block"><a href="#" class="nav-link">Home</a></li>
+      <li class="nav-item d-none d-sm-inline-block"><a href="#" class="nav-link">Contact</a></li>
+    </ul>
 
-    <div class="flex items-center gap-4">
-      <div v-if="props.isAuthenticated" class="text-sm">
-        <span class="mr-3">Hi, {{ props.user?.first_name || props.user?.username }}</span>
-        <button @click="$emit('logout')" class="text-red-600 hover:underline">
-          <font-awesome-icon icon="sign-out-alt" /> Logout
-        </button>
-      </div>
-    </div>
-  </header>
+    <ul class="navbar-nav ml-auto">
+      <li class="nav-item dropdown">
+        <a class="nav-link" data-toggle="dropdown" href="#"
+          ><i class="far fa-bell"></i><span class="badge badge-warning navbar-badge">3</span></a
+        >
+        <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+          <span class="dropdown-item dropdown-header">3 Notifications</span>
+          <div class="dropdown-divider"></div>
+          <a href="#" class="dropdown-item"><i class="fas fa-envelope mr-2"></i> New messages</a>
+        </div>
+      </li>
+
+      <li class="nav-item dropdown">
+        <a class="nav-link" data-toggle="dropdown" href="#">
+          <i class="fas fa-user-circle"></i>
+          <span class="d-none d-md-inline" v-if="user">{{ user.username }}</span>
+        </a>
+        <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
+          <a href="#" class="dropdown-item"><i class="fas fa-user mr-2"></i> Profile</a>
+          <div class="dropdown-divider"></div>
+          <a href="#" class="dropdown-item" @click.prevent="logout"
+            ><i class="fas fa-sign-out-alt mr-2"></i> Logout</a
+          >
+        </div>
+      </li>
+    </ul>
+  </nav>
 </template>
+
+<style scoped>
+.main-header {
+  background: var(--primary, #3c8dbc);
+  color: #fff;
+}
+.nav-link {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+</style>

@@ -1,49 +1,73 @@
 <template>
-  <div class="auth-card">
-    <h2>Create account</h2>
-    <form @submit.prevent="onSubmit" class="form">
-      <input v-model="username" placeholder="Username" required class="input" />
-      <input v-model="email" type="email" placeholder="Email" required class="input" />
-      <input
-        v-model="password"
-        type="password"
-        autocomplete="new-password"
-        placeholder="Password"
-        required
-        class="input"
-      />
-      <input
-        v-model="confirmPassword"
-        type="password"
-        autocomplete="new-password"
-        placeholder="Confirm Password"
-        required
-        class="input"
-      />
-      <label class="label">Role</label>
-      <select v-model="role" class="input">
-        <option value="patient">Patient</option>
-        <option value="doctor">Doctor</option>
-        <option value="nurse">Nurse</option>
-        <option value="staff">Staff</option>
-        <option value="admin">Admin</option>
-      </select>
+  <div class="auth-page container mt-5">
+    <div class="card mx-auto" style="max-width: 720px">
+      <div class="card-header"><h3>Create account</h3></div>
+      <div class="card-body">
+        <form @submit.prevent="submit">
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Username</label>
+              <input v-model="username" required class="form-control" />
+            </div>
+            <div class="form-group col-md-6">
+              <label>Email</label>
+              <input v-model="email" type="email" required class="form-control" />
+            </div>
+          </div>
 
-      <div v-if="error" class="alert error">{{ error }}</div>
-      <div v-if="success" class="alert success">{{ success }}</div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>Password</label>
+              <input
+                v-model="password"
+                type="password"
+                autocomplete="new-password"
+                required
+                class="form-control"
+              />
+            </div>
+            <div class="form-group col-md-6">
+              <label>Confirm Password</label>
+              <input
+                v-model="confirmPassword"
+                type="password"
+                autocomplete="new-password"
+                required
+                class="form-control"
+              />
+            </div>
+          </div>
 
-      <button :disabled="loading" class="btn primary">
-        {{ loading ? 'Creating…' : 'Create account' }}
-      </button>
-    </form>
+          <div class="form-group">
+            <label>Role</label>
+            <select v-model="role" class="form-control">
+              <option value="patient">Patient</option>
+              <option value="doctor">Doctor</option>
+              <option value="staff">Staff</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <div v-if="error" class="alert alert-danger">{{ error }}</div>
+          <div v-if="success" class="alert alert-success">{{ success }}</div>
+
+          <div class="text-right">
+            <button :disabled="loading" class="btn btn-primary">
+              {{ loading ? 'Creating…' : 'Create account' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useAuth } from '@/composables/useAuth'
-const { register } = useAuth()
+import { useRouter } from 'vue-router'
+import api from '@/services/api'
 
+const router = useRouter()
 const username = ref('')
 const email = ref('')
 const password = ref('')
@@ -53,33 +77,63 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 
-async function onSubmit() {
+function safeParse(text: string | null) {
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+async function submit() {
   error.value = ''
   success.value = ''
   if (password.value !== confirmPassword.value) {
     error.value = 'Passwords do not match'
     return
   }
-  if (password.value.length < 6) {
-    error.value = 'Password must be at least 6 characters'
-    return
-  }
   loading.value = true
   try {
-    const res = await register({
-      username: username.value,
-      email: email.value,
-      password: password.value,
-      role: role.value,
-    })
-    if (res.success) {
-      success.value = 'Registration successful — please sign in'
-    } else {
-      error.value = res.error ?? 'Registration failed'
+    // prefer api.post; fallback to fetch so invalid JSON won't throw globally
+    let resp, data
+    try {
+      resp = await api.post('/register/', {
+        username: username.value,
+        email: email.value,
+        password: password.value,
+        role: role.value,
+      })
+      data = resp.data
+    } catch (e: any) {
+      const r = await fetch('/api/register/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username.value,
+          email: email.value,
+          password: password.value,
+          role: role.value,
+        }),
+      })
+      const txt = await r.text()
+      data = safeParse(txt)
+      if (!r.ok) throw { response: { data } }
     }
-  } catch (err) {
-    console.error('Register error', err)
-    error.value = 'Registration failed. See server logs for details.'
+
+    success.value = 'Registration successful. Please login.'
+    // optionally redirect to login
+    router.push({ name: 'login' }).catch(() => {})
+  } catch (err: any) {
+    const d = err?.response?.data
+    if (d && typeof d === 'object') {
+      // join field errors
+      error.value = Object.values(d)
+        .map((v: any) => (Array.isArray(v) ? v.join(' ') : String(v)))
+        .join(' — ')
+    } else {
+      error.value = err?.message ?? 'Registration failed'
+    }
   } finally {
     loading.value = false
   }
@@ -87,52 +141,7 @@ async function onSubmit() {
 </script>
 
 <style scoped>
-.auth-card {
-  max-width: 780px;
-  margin: 20px auto;
+.auth-page {
   padding: 20px;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-}
-.form {
-  display: grid;
-  gap: 12px;
-}
-.input {
-  padding: 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-}
-.btn {
-  padding: 10px;
-  border-radius: 6px;
-  border: none;
-}
-.primary {
-  background: #1a75bc;
-  color: #fff;
-}
-.alert {
-  padding: 8px;
-  border-radius: 6px;
-}
-.error {
-  background: #fff1f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-.success {
-  background: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #bbf7d0;
-}
-.label {
-  font-weight: 600;
-}
-@media (max-width: 640px) {
-  .auth-card {
-    margin: 12px;
-  }
 }
 </style>

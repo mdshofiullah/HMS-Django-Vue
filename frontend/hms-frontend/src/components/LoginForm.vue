@@ -65,6 +65,7 @@ async function onSubmit() {
   flex-direction: column;
   gap: 10px;
 }
+
 .input {
   padding: 10px;
   border: 1px solid #e5e7eb;

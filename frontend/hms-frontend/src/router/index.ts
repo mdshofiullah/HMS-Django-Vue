@@ -1,13 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-
-// Import all your components
-import LoginForm from '@/components/LoginForm.vue'
-import RegisterForm from '@/components/RegisterForm.vue'
+import type { RouteLocationNormalized, NavigationGuardNext } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 import DashboardView from '@/components/DashboardView.vue'
 import AdminDashboard from '@/components/AdminDashboard.vue'
 import DoctorDashboard from '@/components/DoctorDashboard.vue'
 import PatientDashboard from '@/components/PatientDashboard.vue'
+import LoginForm from '@/components/LoginForm.vue'
+import RegisterForm from '@/components/RegisterForm.vue'
 import UserManagement from '@/components/UserManagement.vue'
 import DepartmentManagement from '@/components/DepartmentManagement.vue'
 import DoctorManagement from '@/components/DoctorManagement.vue'
@@ -20,28 +19,10 @@ import ReportManagement from '@/components/ReportManagement.vue'
 import ProfileView from '@/components/ProfileView.vue'
 
 const routes = [
-  {
-    path: '/',
-    redirect: '/dashboard',
-  },
-  {
-    path: '/login',
-    name: 'login',
-    component: LoginForm,
-    meta: { requiresAuth: false },
-  },
-  {
-    path: '/register',
-    name: 'register',
-    component: RegisterForm,
-    meta: { requiresAuth: false },
-  },
-  {
-    path: '/dashboard',
-    name: 'dashboard',
-    component: DashboardView,
-    meta: { requiresAuth: true },
-  },
+  { path: '/', redirect: '/dashboard' },
+  { path: '/login', name: 'login', component: LoginForm, meta: { requiresAuth: false } },
+  { path: '/register', name: 'register', component: RegisterForm, meta: { requiresAuth: false } },
+  { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },
   {
     path: '/admin-dashboard',
     name: 'admin-dashboard',
@@ -72,12 +53,7 @@ const routes = [
     component: DepartmentManagement,
     meta: { requiresAuth: true, requiresRole: 'admin' },
   },
-  {
-    path: '/doctors',
-    name: 'doctors',
-    component: DoctorManagement,
-    meta: { requiresAuth: true },
-  },
+  { path: '/doctors', name: 'doctors', component: DoctorManagement, meta: { requiresAuth: true } },
   {
     path: '/patients',
     name: 'patients',
@@ -102,24 +78,14 @@ const routes = [
     component: LabTestManagement,
     meta: { requiresAuth: true },
   },
-  {
-    path: '/billing',
-    name: 'billing',
-    component: BillingManagement,
-    meta: { requiresAuth: true },
-  },
+  { path: '/billing', name: 'billing', component: BillingManagement, meta: { requiresAuth: true } },
   {
     path: '/reports',
     name: 'reports',
     component: ReportManagement,
     meta: { requiresAuth: true, requiresRole: 'admin' },
   },
-  {
-    path: '/profile',
-    name: 'profile',
-    component: ProfileView,
-    meta: { requiresAuth: true },
-  },
+  { path: '/profile', name: 'profile', component: ProfileView, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({
@@ -127,38 +93,44 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, _from, next) => {
-  const authStore = useAuthStore()
-  authStore.checkAuthStatus()
+router.beforeEach(
+  async (
+    to: RouteLocationNormalized,
+    _from: RouteLocationNormalized,
+    next: NavigationGuardNext,
+  ) => {
+    const { isAuthenticated, currentUser } = useAuth()
+    // ensure auth initialized
+    // initAuth is called in main.ts so store should be ready, but guard will redirect if not authenticated
+    const isAuth = (isAuthenticated as any).value as boolean
+    const user = (currentUser as any).value as { role?: string } | null
 
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next({ name: 'login' })
-  } else if (to.meta.requiresRole && authStore.user?.role !== to.meta.requiresRole) {
-    // Redirect to appropriate dashboard based on role
-    if (authStore.user?.role === 'admin') {
-      next({ name: 'admin-dashboard' })
-    } else if (authStore.user?.role === 'doctor') {
-      next({ name: 'doctor-dashboard' })
-    } else if (authStore.user?.role === 'patient') {
-      next({ name: 'patient-dashboard' })
-    } else {
-      next({ name: 'dashboard' })
+    if (to.meta.requiresAuth && !isAuth) {
+      next({ name: 'login' })
+      return
     }
-  } else if ((to.name === 'login' || to.name === 'register') && authStore.isAuthenticated) {
-    // Redirect to appropriate dashboard if already logged in
-    if (authStore.user?.role === 'admin') {
-      next({ name: 'admin-dashboard' })
-    } else if (authStore.user?.role === 'doctor') {
-      next({ name: 'doctor-dashboard' })
-    } else if (authStore.user?.role === 'patient') {
-      next({ name: 'patient-dashboard' })
-    } else {
-      next({ name: 'dashboard' })
+
+    if (to.meta.requiresRole && user?.role !== to.meta.requiresRole) {
+      // redirect to appropriate dashboard or login
+      if (!isAuth) next({ name: 'login' })
+      else if (user?.role === 'admin') next({ name: 'admin-dashboard' })
+      else if (user?.role === 'doctor') next({ name: 'doctor-dashboard' })
+      else if (user?.role === 'patient') next({ name: 'patient-dashboard' })
+      else next({ name: 'dashboard' })
+      return
     }
-  } else {
+
+    if ((to.name === 'login' || to.name === 'register') && isAuth) {
+      // already logged in -> redirect to role dashboard
+      if (user?.role === 'admin') next({ name: 'admin-dashboard' })
+      else if (user?.role === 'doctor') next({ name: 'doctor-dashboard' })
+      else if (user?.role === 'patient') next({ name: 'patient-dashboard' })
+      else next({ name: 'dashboard' })
+      return
+    }
+
     next()
-  }
-})
+  },
+)
 
 export default router
-

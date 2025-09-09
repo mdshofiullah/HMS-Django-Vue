@@ -1,132 +1,133 @@
 <template>
-  <div class="dashboard">
-    <header class="dash-header">
-      <h1>Welcome back, {{ user?.username ?? 'User' }}!</h1>
-      <p class="muted">Overview of system activity</p>
-    </header>
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-lg-3 col-6" v-for="w in widgets" :key="w.key">
+          <div class="small-box dashboard-widget" :class="w.bg">
+            <div class="inner">
+              <h3>{{ w.value }}</h3>
+              <p>{{ w.title }}</p>
+            </div>
+            <div class="icon"><i :class="`fas fa-${w.icon} widget-icon`"></i></div>
+            <a href="#" class="small-box-footer"
+              >More info <i class="fas fa-arrow-circle-right"></i
+            ></a>
+          </div>
+        </div>
+      </div>
 
-    <div class="stats-grid">
-      <div class="card" v-for="(value, key) in stats" :key="key">
-        <div class="card-icon"><i :class="icons[key]"></i></div>
-        <div>
-          <h3>{{ value }}</h3>
-          <p class="muted">{{ labels[key] }}</p>
+      <div class="row mt-3">
+        <div class="col-lg-7">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title"><i class="fas fa-chart-line mr-1"></i> Patient Admissions</h3>
+            </div>
+            <div class="card-body">
+              <!-- use the lightweight SVG chart component -->
+              <SimpleLineChart :labels="labels" :points="points" />
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Doctor Availability</h3>
+            </div>
+            <div class="card-body p-0">
+              <ul class="products-list product-list-in-card pl-2 pr-2">
+                <li class="item" v-for="d in doctors" :key="d.id">
+                  <div class="product-img">
+                    <img :src="d.avatar" class="img-size-50 rounded-circle" />
+                  </div>
+                  <div class="product-info">
+                    <a href="#" class="product-title">
+                      {{ d.name }}
+                      <span class="badge badge-info float-right">{{ d.status }}</span>
+                    </a>
+                    <span class="product-description">{{ d.specialty }}</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-
-    <section class="recent">
-      <h2>Recent activity</h2>
-      <ul class="list">
-        <li v-for="a in recentActivities" :key="a.id" class="list-item">
-          <div class="activity-icon"><i :class="a.icon"></i></div>
-          <div>
-            <p>{{ a.description }}</p>
-            <small class="muted">{{ a.time }}</small>
-          </div>
-        </li>
-      </ul>
-    </section>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useAuth } from '@/composables/useAuth'
-import api from '@/services/api'
+import { ref } from 'vue'
+import SimpleLineChart from '@/components/SimpleLineChart.vue'
 
-const { currentUser } = useAuth()
-const user = computed(() => currentUser.value)
-
-const stats = ref({ patients: 0, doctors: 0, appointments: 0, labTests: 0 })
-const icons: Record<string, string> = {
-  patients: 'fas fa-users',
-  doctors: 'fas fa-user-md',
-  appointments: 'fas fa-calendar-check',
-  labTests: 'fas fa-flask',
-}
-const labels: Record<string, string> = {
-  patients: 'Total Patients',
-  doctors: 'Total Doctors',
-  appointments: "Today's Appointments",
-  labTests: 'Pending Lab Tests',
-}
-
-const recentActivities = ref([
-  { id: 1, icon: 'fas fa-user-plus', description: 'New patient registered', time: '2 hours ago' },
+const widgets = ref([
+  { key: 'patients', title: 'New Patients', value: 150, icon: 'user-injured', bg: 'bg-info' },
+  { key: 'doctors', title: 'Doctors Available', value: 53, icon: 'stethoscope', bg: 'bg-success' },
   {
-    id: 2,
-    icon: 'fas fa-calendar-check',
-    description: 'Appointment scheduled',
-    time: '5 hours ago',
+    key: 'appointments',
+    title: 'Appointments Today',
+    value: 44,
+    icon: 'calendar-check',
+    bg: 'bg-warning',
+  },
+  {
+    key: 'revenue',
+    title: 'Revenue This Month',
+    value: '$7,250',
+    icon: 'dollar-sign',
+    bg: 'bg-danger',
   },
 ])
 
-onMounted(async () => {
-  try {
-    const resp = await api.get('/dashboard/stats/')
-    stats.value = resp.data
-  } catch (err) {
-    console.warn('Dashboard stats fetch failed', err)
-  }
-})
+const doctors = ref([
+  {
+    id: 1,
+    name: 'Dr. Emily Parker',
+    specialty: 'Cardiology',
+    status: 'Available',
+    avatar: 'https://via.placeholder.com/50',
+  },
+  {
+    id: 2,
+    name: 'Dr. Robert Chen',
+    specialty: 'Neurology',
+    status: 'Busy',
+    avatar: 'https://via.placeholder.com/50',
+  },
+  {
+    id: 3,
+    name: 'Dr. Maria Rodriguez',
+    specialty: 'Pediatrics',
+    status: 'Available',
+    avatar: 'https://via.placeholder.com/50',
+  },
+])
+
+// sample labels/points used by SimpleLineChart
+const labels = ref(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'])
+const points = ref([65, 59, 80, 81, 56, 75])
 </script>
 
 <style scoped>
-.dashboard {
-  padding: 20px;
-}
-.dash-header h1 {
+.small-box .inner h3 {
   font-size: 1.6rem;
-  margin-bottom: 2px;
 }
-.muted {
-  color: #6b7280;
-}
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-top: 18px;
-}
-.card {
-  background: #fff;
-  padding: 14px;
+.dashboard-widget {
+  padding: 1rem;
+  color: #fff;
   border-radius: 8px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
 }
-.card-icon {
-  background: #eef2ff;
-  padding: 10px;
-  border-radius: 8px;
-  color: #4f46e5;
+.bg-info {
+  background: linear-gradient(45deg, #3c8dbc, #4da0db);
 }
-.recent {
-  margin-top: 20px;
+.bg-success {
+  background: linear-gradient(45deg, #00a65a, #3dd06a);
 }
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.bg-warning {
+  background: linear-gradient(45deg, #f39c12, #f6b04f);
 }
-.list-item {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 10px 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-@media (max-width: 1024px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 640px) {
-  .stats-grid {
-    grid-template-columns: repeat(1, 1fr);
-  }
+.bg-danger {
+  background: linear-gradient(45deg, #dd4b39, #f46a5a);
 }
 </style>

@@ -1,44 +1,57 @@
 <template>
-  <div class="users">
-    <div class="header">
+  <div class="users p-4">
+    <div class="d-flex justify-content-between mb-3">
       <h2>Users</h2>
-      <div class="controls">
-        <input v-model="search" placeholder="Search users" class="input" />
-        <button @click="fetchUsers" class="btn">Refresh</button>
+      <div>
+        <input v-model="search" placeholder="Search users" class="form-control form-control-sm" />
+        <button @click="fetchUsers" class="btn btn-sm btn-light ml-2">Refresh</button>
       </div>
     </div>
 
-    <div v-if="loading" class="muted">Loading users…</div>
-
-    <ul v-else class="user-list">
-      <li v-for="u in filteredUsers" :key="u.id" class="user-item">
-        <div>
-          <div class="username">{{ u.username }}</div>
-          <div class="muted">{{ u.email }}</div>
-        </div>
-        <div>
-          <span class="badge" :class="roleClass(u.role)">{{ u.role ?? '—' }}</span>
-        </div>
-      </li>
-    </ul>
+    <div v-if="loading">Loading users…</div>
+    <div v-else>
+      <table class="table table-sm table-striped w-100">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="u in filtered" :key="u.id">
+            <td>{{ u.id }}</td>
+            <td>{{ u.username }}</td>
+            <td>{{ u.email }}</td>
+            <td>{{ u.role ?? (u.is_staff ? 'admin' : 'user') }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="error" class="text-danger mt-2">{{ error }}</div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import api from '@/services/api'
+import type { User } from '@/composables/useAuth'
 
-const users = ref<Array<Record<string, any>>>([])
+const users = ref<User[]>([])
 const loading = ref(false)
-const search = ref('')
+const error = ref<string>('')
+const search = ref<string>('')
 
-const fetchUsers = async () => {
+async function fetchUsers(): Promise<void> {
   loading.value = true
+  error.value = ''
   try {
-    const resp = await api.get('/users/')
-    users.value = resp.data
+    const resp = await api.get<User[]>('/users/')
+    users.value = resp.data ?? []
   } catch (err) {
-    console.error('Error fetching users:', err)
+    const e = err as any
+    error.value = e?.response?.data?.detail ?? e?.message ?? 'Failed to fetch users'
   } finally {
     loading.value = false
   }
@@ -46,84 +59,9 @@ const fetchUsers = async () => {
 
 onMounted(() => void fetchUsers())
 
-const filteredUsers = computed(() =>
-  users.value.filter((u) =>
-    search.value
-      ? `${u.username} ${u.email}`.toLowerCase().includes(search.value.toLowerCase())
-      : true,
-  ),
-)
-
-function roleClass(role?: string) {
-  return role === 'admin' ? 'badge-admin' : role === 'doctor' ? 'badge-doctor' : 'badge-staff'
-}
+const filtered = computed(() => {
+  if (!search.value) return users.value
+  const q = search.value.toLowerCase()
+  return users.value.filter((u) => `${u.username ?? ''} ${u.email ?? ''}`.toLowerCase().includes(q))
+})
 </script>
-
-<style scoped>
-.users {
-  padding: 16px;
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.input {
-  padding: 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-}
-
-.btn {
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: #efefef;
-}
-
-.user-list {
-  list-style: none;
-  padding: 0;
-  margin: 12px 0;
-}
-
-.user-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  border-radius: 8px;
-  background: #fff;
-  margin-bottom: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
-}
-
-.badge {
-  padding: 6px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-}
-
-.badge-admin {
-  background: #ede9fe;
-  color: #6b21a8;
-}
-
-.badge-doctor {
-  background: #ecfdf5;
-  color: #065f46;
-}
-
-.badge-staff {
-  background: #e0f2fe;
-  color: #075985;
-}
-</style>

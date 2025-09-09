@@ -6,3 +6,4 @@
     <p class="text-sm text-gray-600">Report generation coming soon.</p>
   </div>
 </template>
+
